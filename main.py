@@ -19,7 +19,7 @@ class MyApp(ShowBase):
         
     def spinCameraTask(self, task):
 
-        angleDegrees = task.time * 6
+        angleDegrees = task.time * 20
 
         angleRadians = angleDegrees * (pi / 180.0)
 

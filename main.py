@@ -1,7 +1,13 @@
-from direct.showbase.ShowBase import ShowBase
-from direct.task import Task
 from math import pi, sin, cos
 
+from direct.showbase.ShowBase import ShowBase
+from panda3d.core import DirectionalLight, AmbientLight
+from panda3d.core import TransparencyAttrib
+from panda3d.core import WindowProperties
+from panda3d.core import CollisionTraverser, CollisionNode, CollisionBox, CollisionRay, CollisionHandlerQueue
+from direct.gui.OnscreenImage import OnscreenImage
+def degToRad(degrees):
+        return degrees * (pi / 180.0)
 speed = 100.0
 y_delta = 0
 x_delta = 0
@@ -15,72 +21,116 @@ class MyApp(ShowBase):
     def __init__(self):
             
         ShowBase.__init__(self)
-        # Load the environment model.
 
-        self.scene = self.loader.loadModel("models/environment")
-
-        # Reparent the model to render.
-
-        self.scene.reparentTo(self.render)
-
-        # Apply scale and position transforms on the model.
-
-        self.scene.setScale(0.25, 0.25, 0.25)
-
-        self.scene.setPos(-8, 42, 0)
-
+        self.setupscene()
         base.disableMouse()
-        self.gun = self.loader.loadModel('M4A4.glb')
-        self.gun.reparentTo(self.render)
-        self.gun.setScale(500, 500, 500)
-        self.gun.setPos(0, 0, 0)
-        self.camera.setPos(self.gun.getX() - 0.4, self.gun.getY() - 5, self.gun.getZ() + 8)
-        self.camera.setP(self.gun.getP())
-        self.gun.setR(-90)
-        self.taskMgr.add(self.look, "look")
-        self.taskMgr.add(self.movche, "check if i moved")
-        
-    def movche(self, task):
-        base.buttonThrowers[0].node().setKeystrokeEvent('keystroke')
-        self.accept("keystroke", self.move)
-        return Task.cont
+        self.setupControls()
+        self.captureMouse()
+        self.taskMgr.add(self.update, "update")
 
-    def look(self, task):
-        global xd, yd
+    def update(self, task):
+        dt = globalClock.getDt()
 
+        playerMoveSpeed = 10
 
-        if base.mouseWatcherNode.hasMouse():
-            x = base.mouseWatcherNode.getMouseX()
-            y = base.mouseWatcherNode.getMouseY()
-            self.gun.setH(self.gun.getH() + ((xd - x) * 180))
-            self.gun.setP(self.gun.getP() + ((yd - y) * -180))
-            self.camera.setP(self.gun.getP())
-            self.camera.setH(self.gun.getH())
-            xd = x
-            yd = y
-            x = 0 
-            y = 0
+        x_movement = 0
+        y_movement = 0
+        z_movement = 0
 
-        return Task.cont
+        if self.keyMap['forward']:
+            x_movement -= dt * playerMoveSpeed * sin(degToRad(self.camera.getH()))
+            y_movement += dt * playerMoveSpeed * cos(degToRad(self.camera.getH()))
+        if self.keyMap['backward']:
+            x_movement += dt * playerMoveSpeed * sin(degToRad(self.camera.getH()))
+            y_movement -= dt * playerMoveSpeed * cos(degToRad(self.camera.getH()))
+        if self.keyMap['left']:
+            x_movement -= dt * playerMoveSpeed * cos(degToRad(self.camera.getH()))
+            y_movement -= dt * playerMoveSpeed * sin(degToRad(self.camera.getH()))
+        if self.keyMap['right']:
+            x_movement += dt * playerMoveSpeed * cos(degToRad(self.camera.getH()))
+            y_movement += dt * playerMoveSpeed * sin(degToRad(self.camera.getH()))
+        if self.keyMap['up']:
+            z_movement += dt * playerMoveSpeed
+        if self.keyMap['down']:
+            z_movement -= dt * playerMoveSpeed
+
+        self.camera.setPos(
+            self.camera.getX() + x_movement,
+            self.camera.getY() + y_movement,
+            self.camera.getZ() + z_movement,
+        )
+
+        if self.cameraSwingActivated:
+            md = self.win.getPointer(0)
+            mouseX = md.getX()
+            mouseY = md.getY()
+
+            mouseChangeX = mouseX - self.lastMouseX
+            mouseChangeY = mouseY - self.lastMouseY
+
+            self.cameraSwingFactor = 10
+
+            currentH = self.camera.getH()
+            currentP = self.camera.getP()
+
+            self.camera.setHpr(
+                currentH - mouseChangeX * dt * self.cameraSwingFactor,
+                min(90, max(-90, currentP - mouseChangeY * dt * self.cameraSwingFactor)),
+                0
+            )
+
+            self.lastMouseX = mouseX
+            self.lastMouseY = mouseY
+        return task.cont
     
+    def setupControls(self):
+        self.keyMap = {
+            "forward": False,
+            "backward": False,
+            "left": False,
+            "right": False,
+            "up": False,
+            "down": False,
+        }
 
-    def move(self, keyname):
-        global y_delta, x_delta
+        self.accept('escape', self.releaseMouse)
+        # self.accept('mouse1', self.)
+        # self.accept('mouse3', self.)
 
-        if keyname == "w":
-            y_delta = (speed * globalClock.get_dt())
-        if keyname == "s":
-            y_delta = ((speed * globalClock.get_dt()) * -1)
-        y_delta += self.gun.getY()
-        self.gun.setY(y_delta)
-        y_delta = 0
-        if keyname == "d":
-            x_delta = (speed * globalClock.get_dt())
-        if keyname == "a":
-            x_delta = ((speed * globalClock.get_dt()) * -1)
-        x_delta += self.gun.getX()
-        self.gun.setX(x_delta)
-        x_delta = 0
-        self.camera.setPos(self.gun.getX() - 0.4, self.gun.getY() - 5, self.gun.getZ() + 8)
+        self.accept('w', self.updateKeyMap, ['forward', True])
+        self.accept('w-up', self.updateKeyMap, ['forward', False])
+        self.accept('a', self.updateKeyMap, ['left', True])
+        self.accept('a-up', self.updateKeyMap, ['left', False])
+        self.accept('s', self.updateKeyMap, ['backward', True])
+        self.accept('s-up', self.updateKeyMap, ['backward', False])
+        self.accept('d', self.updateKeyMap, ['right', True])
+        self.accept('d-up', self.updateKeyMap, ['right', False])
+    def updateKeyMap(self, key, value):
+        self.keyMap[key] = value
+    def captureMouse(self):
+        self.cameraSwingActivated = True
+
+        md = self.win.getPointer(0)
+        self.lastMouseX = md.getX()
+        self.lastMouseY = md.getY()
+
+        properties = WindowProperties()
+        properties.setCursorHidden(True)
+        properties.setMouseMode(WindowProperties.M_relative)
+        self.win.requestProperties(properties)
+    def releaseMouse(self):
+        self.cameraSwingActivated = False
+
+        properties = WindowProperties()
+        properties.setCursorHidden(False)
+        properties.setMouseMode(WindowProperties.M_absolute)
+        self.win.requestProperties(properties)
+    def setupscene(self):
+        self.scene = self.loader.loadModel("models/environment")
+        self.scene.reparentTo(self.render)
+        self.scene.setScale(0.25, 0.25, 0.25)
+        self.scene.setPos(-8, 42, 0)
+        self.camera.setZ(5)
+
 app = MyApp()
 app.run()

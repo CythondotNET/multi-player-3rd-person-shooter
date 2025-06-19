@@ -31,7 +31,7 @@ class MyApp(ShowBase):
     def update(self, task):
         dt = globalClock.getDt()
 
-        playerMoveSpeed = 10
+        playerMoveSpeed = 50
 
         x_movement = 0
         y_movement = 0

@@ -94,8 +94,8 @@ class MyApp(ShowBase):
         }
 
         self.accept('escape', self.releaseMouse)
-        # self.accept('mouse1', self.)
-        # self.accept('mouse3', self.)
+        #self.accept('mouse1', self.)
+        #self.accept('mouse3', self.)
 
         self.accept('w', self.updateKeyMap, ['forward', True])
         self.accept('w-up', self.updateKeyMap, ['forward', False])
